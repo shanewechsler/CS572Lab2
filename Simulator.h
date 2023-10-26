@@ -43,42 +43,21 @@ class Memory{
         
         long memoryEntries[MEMORY_ENTRY_COUNT]; 
 
+        int shiftSize = 2;
     public:
+        Memory(){
+            this->baseAddress = 0x0;
+        }
+
+        Memory(unsigned int baseAddress, int shiftSize){
+            this->baseAddress = baseAddress;
+            this->shiftSize = shiftSize;
+        };
         unsigned int getBaseAddress();
 
         long ReadAddress(unsigned int address); // "load", reads the data @address
 
         void WriteToAddress(long word, unsigned int address); //"store", stores double word @address
-
-        unsigned int ConvertAddressToIndex(unsigned int address); //converts 32 bit address into an array index for memoryEntries
-
-        unsigned int ConvertIndexToAddress(unsigned int index);
-};
-
-class DataMemory : public Memory{
-    public:
-        DataMemory(){
-            this->baseAddress = 0x0;
-        }
-
-        DataMemory(unsigned int baseAddress){
-            this->baseAddress = baseAddress;
-        };
-
-        unsigned int ConvertAddressToIndex(unsigned int address);
-
-        unsigned int ConvertIndexToAddress(unsigned int index);
-};
-
-class CodeMemory : public Memory{
-    public:
-        CodeMemory(){
-            this->baseAddress = 0x0;
-        }
-
-        CodeMemory(unsigned int baseAddress){
-            this->baseAddress = baseAddress;
-        };
 
         unsigned int ConvertAddressToIndex(unsigned int address);
 

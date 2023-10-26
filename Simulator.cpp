@@ -18,20 +18,12 @@ void Memory::WriteToAddress(long word, unsigned int address){ //just longs and n
     this->memoryEntries[index] = word;
 }
 
-unsigned int CodeMemory::ConvertAddressToIndex(unsigned int address){
-    return (address - this->baseAddress) >> 2; //32 bit addresses are in bytes, but we're storing words so divide by 8
+unsigned int Memory::ConvertAddressToIndex(unsigned int address){
+    return (address - this->baseAddress) >> shiftSize; //shift to get index
 }
 
-unsigned int CodeMemory::ConvertIndexToAddress(unsigned int index){
-    return (index + this->baseAddress) << 2;
-}
-
-unsigned int DataMemory :: ConvertAddressToIndex(unsigned int address){
-    return (address - this->baseAddress);
-}
-
-unsigned int DataMemory :: ConvertIndexToAddress(unsigned int index){
-    return (index + this->baseAddress);
+unsigned int Memory::ConvertIndexToAddress(unsigned int index){
+    return (index + this->baseAddress) << shiftSize;
 }
 
 
@@ -49,21 +41,21 @@ void Assembler::initMap(){
 }
 
 long Assembler::assembleInstr(std::string op, int r1, int r2, int last){
-    unsigned long initInstr = 0x0;
+    long initInstr = 0x0; //code format: bytes 40-32 opcode, 32-27 R1, 27-22 R2, 22-0 label/offset/immediate
 
-    initInstr  = (initInstr | (opcodes[op] << 32));
+    initInstr  = (initInstr | (ulong(opcodes[op]) << 32)); //opcode, r1, r2 are all positive
 
-    initInstr = (initInstr | (r1 << 27));
+    initInstr = (initInstr | (ulong(r1) << 27));
 
-    initInstr = (initInstr | (r2 << 22));
+    initInstr = (initInstr | (ulong(r2) << 22));
 
-    initInstr = (initInstr | last);
+    initInstr = (initInstr | (0x3FFFFF & last)); //signed integer, last 22 bytes.
 
     return initInstr;
 }
 
 int Disassembler :: GetOpcode(long instruction){
-    int opcode = (0xFF00000000 & instruction) >> 32;
+    int opcode = (0xFF00000000 & instruction) >> 32; //masks to isolate different codes
     return opcode;
 }
 
@@ -78,6 +70,7 @@ int Disassembler :: GetR2(long instruction){
 }
 
 int Disassembler :: GetLabelOrOffset(long instruction){
-    int last = (0x3FFFFF & instruction);
-    return last;
+    int last = (0x3FFFFF & instruction) << 10; //shift to the end of 32 so it recognizes that it's signed
+    int sint = last >> 10; //shift back, if negative, will be recognized
+    return sint;
 }
