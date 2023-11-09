@@ -28,6 +28,7 @@ unsigned int Memory::ConvertIndexToAddress(unsigned int index){
 
 
 void Assembler::initMap(){
+    this->opcodes["add"] = ADD_SIG;
     this->opcodes["addi"] = ADDI_SIG;
     this->opcodes["b"] = B_SIG;
     this->opcodes["beqz"] = BEQZ_SIG;

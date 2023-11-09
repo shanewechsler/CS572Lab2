@@ -12,16 +12,18 @@
 #define INSTR_IDX 0
 #define OPERAND_IDX 1
 
-#define ADDI_SIG 0x0
-#define B_SIG 0x1
-#define BEQZ_SIG 0x2
-#define BGE_SIG 0x3
-#define BNE_SIG 0x4
-#define LA_SIG 0x5
-#define LB_SIG 0x6
-#define LI_SIG 0x7
-#define SUBI_SIG 0x8
-#define SYSCALL_SIG 0x9
+#define ADD_SIG 0x0
+#define ADDI_SIG 0x1
+#define B_SIG 0x2
+#define BEQZ_SIG 0x3
+#define BGE_SIG 0x4
+#define BNE_SIG 0x5
+#define LA_SIG 0x6
+#define LB_SIG 0x7
+#define LI_SIG 0x8
+#define SUBI_SIG 0x9
+#define SYSCALL_SIG 0xA
+#define NOP_SIG 0xB
 
 #define C_ADDI 6
 #define C_B 4

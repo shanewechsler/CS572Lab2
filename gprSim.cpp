@@ -3,9 +3,13 @@
 #include <fstream>
 #include <string>
 #include <cstring>
+#include <queue>
 
 Memory userData = Memory(USER_DATA_BASE, 0); //data is split into bytes for string, no shifting
 Memory userText = Memory(USER_TEXT_BASE, 2); //code is split into words, shift by 2 to get array index
+
+Assembler codeWriter = Assembler();
+Disassembler codeTranslator = Disassembler();
 
 char* sysString; //string to test
 
@@ -13,7 +17,185 @@ int GPRs[NUMBER_OF_REGISTERS];
 
 using namespace std;
 
+queue<int> Rsrc1s;
+queue<int> Rsrc2s;
+queue<int> immediates;
+
+queue<long> IFID;
+queue<int> IDEX;
+queue<int> EXMEM;
+queue<int> MEMWB;
+queue<int> dests;
+
 unsigned int nextFreeSpace = USER_DATA_BASE; //first address availible in data memory
+
+void IF(unsigned int &PC){
+    IFID.push(userText.ReadAddress(PC));
+    PC += 4;
+}
+
+void ID(){
+    if(!IFID.empty()){
+        long instruction = IFID.front();
+        IFID.pop();
+        int opcode = codeTranslator.GetOpcode(instruction);
+        IDEX.push(opcode);
+        int r1 = codeTranslator.GetR1(instruction);
+        int r2 = codeTranslator.GetR2(instruction);
+        int last = codeTranslator.GetLabelOrOffset(instruction);
+    
+        int A = 0; //simulating "don't cares"
+        int B = 0;
+        int imm = 0;
+        int dest = 0;
+
+        switch(opcode){
+            case ADD_SIG:
+                A = GPRs[r2];
+                B = GPRs[last];
+                dest = r1;
+                break;
+            case ADDI_SIG:
+                A = GPRs[r2];
+                imm = last;
+                dest = r1;
+                break;
+            case B_SIG:
+                imm = last;
+                break;
+            case BEQZ_SIG:
+                A = GPRs[r1];
+                imm = last;
+                break;
+            case BGE_SIG:
+                A = GPRs[r1];
+                B = GPRs[r2];
+                imm = last;
+                break;
+            case BNE_SIG:
+                A = GPRs[r1];
+                B = GPRs[r2];
+                imm = last;
+                break;
+            case LA_SIG:
+                imm = last;
+                dest = r1;
+                break;
+            case LB_SIG:
+                A = GPRs[r2];
+                imm = last;
+                dest = r1;
+                break;
+            case LI_SIG:
+                imm = last;
+                dest = r1;
+                break;
+            case SUBI_SIG:
+                A = GPRs[r2];
+                imm = last;
+                dest = r1;
+                break;
+        }
+
+        Rsrc1s.push(A);
+        Rsrc2s.push(B);
+        immediates.push(imm);
+        dests.push(dest);
+    }
+
+}
+
+void EX(unsigned int &PC){
+    if(!IDEX.empty()){
+        int opcode = IDEX.front();
+        IDEX.pop();
+
+        EXMEM.push(opcode);
+    
+        int A = Rsrc1s.front();
+        int B = Rsrc2s.front();
+        int imm = immediates.front();
+
+        Rsrc1s.pop();
+        Rsrc2s.pop();
+        immediates.pop();
+
+        int result = 0;
+        switch(opcode){
+            case ADD_SIG:
+                result = A + B;
+                break;
+            case ADDI_SIG:
+                result = A + imm;
+                break;
+            case B_SIG:
+                PC += imm;
+                break;
+            case BEQZ_SIG:
+                if(A == 0){
+                    PC += imm;
+                }
+                break;
+            case BGE_SIG:
+                if(A >= B){
+                    PC += imm;
+                }
+                break;
+            case BNE_SIG:
+                if(A != B){
+                    PC += imm;
+                }
+                break;
+            case LA_SIG:
+                result = PC + imm;
+                break;
+            case LB_SIG:
+                result = A + imm;
+                break;
+            case LI_SIG:
+                result = imm;
+                break;
+            case SUBI_SIG:
+                result = A - imm;
+                break;
+        }
+        EXMEM.push(result);
+    }
+}
+
+void MEM(){
+    if(!EXMEM.empty()){
+        int opcode = EXMEM.front();
+        EXMEM.pop();
+        int ALUResult = EXMEM.front();
+        EXMEM.pop();
+
+        MEMWB.push(opcode);
+
+        int memResult = ALUResult;
+        if(opcode == LA_SIG || opcode == LB_SIG){
+            memResult = userData.ReadAddress(ALUResult);
+        }
+
+        MEMWB.push(memResult);
+    }
+}
+
+void WB(){
+    if(!MEMWB.empty()){
+        int opcode = MEMWB.front();
+        MEMWB.pop();
+        int result = MEMWB.front();
+        MEMWB.pop();
+
+        int destination = dests.front();
+        dests.pop();
+
+        if(opcode == ADD_SIG || opcode == ADDI_SIG || opcode == LA_SIG || opcode == LB_SIG || opcode == LI_SIG || opcode == SUBI_SIG){
+            GPRs[destination] = result;
+        }
+    }
+}
 
 void sectionData(unsigned int bytes){
     nextFreeSpace = nextFreeSpace + bytes; //reserve x no of bytes in data memory
@@ -46,6 +228,10 @@ void SYSCALL(bool &userMode){
     }else if(GPRs[20] == 10){ //syscall signal 10 exits program
         userMode = false;
     }
+}
+
+void ADD(int Rdest, int Rsrc1, int Rsrc2){
+    GPRs[Rdest] = GPRs[Rsrc1] + GPRs[Rsrc2];
 }
 
 void ADDI(int Rdest, int Rsrc1, int imm){
@@ -97,10 +283,6 @@ int main(int argc, char **argv){
         cout << "Second command line input shpuld be palindrome to test." << endl;
         exit(1);
     }
-
-    
-    Assembler codeWriter = Assembler();
-    Disassembler codeTranslator = Disassembler();
 
     bool dataMode = false;
 
@@ -183,62 +365,14 @@ int main(int argc, char **argv){
     }
 
     unsigned int PC = USER_TEXT_BASE;
-    unsigned int IC = 0;
     unsigned int C = 0;
     bool userMode = true;
     while(userMode){
-        long instruction = userText.ReadAddress(PC);
-        PC += 4;
-        IC++;
-        int opcode = codeTranslator.GetOpcode(instruction);
-        int R1 = codeTranslator.GetR1(instruction);
-        int R2 = codeTranslator.GetR2(instruction);
-        int last = codeTranslator.GetLabelOrOffset(instruction);
-        switch(opcode){
-            case ADDI_SIG:
-                ADDI(R1, R2, last);
-                C += C_ADDI;
-                break;
-            case B_SIG:
-                B(PC, last);
-                C += C_B;
-                break;
-            case BEQZ_SIG:
-                BEQZ(PC, R1, last);
-                C += C_BEX;
-                break;
-            case BGE_SIG:
-                BGE(PC, R1, R2, last);
-                C += C_BEX;
-                break;
-            case BNE_SIG:
-                BNE(PC, R1, R2, last);
-                C += C_BEX;
-                break;
-            case LA_SIG:
-                LA(PC, R1, last);
-                C += C_LA;
-                break;
-            case LB_SIG:
-                LB(R1, last, R2);
-                C +=  C_LB;
-                break;
-            case LI_SIG:
-                LI(R1, last);
-                C += C_LI;
-                break;
-            case SUBI_SIG:
-                SUBI(R1, R2, last);
-                C += C_SUBI;
-                break;
-            case SYSCALL_SIG:
-                SYSCALL(userMode);
-                C += C_SYSCALL;
-                break;
-        }
+        IF(PC);
+        ID();
+        EX(PC);
+        MEM();
+        WB();
     }
-    cout << "Instuction Count: " << IC << endl;
-    cout << "Cycle Count: " << C << endl;
-    cout << "Speedup from Single Cycle: " << (float) (8*IC)/C << endl;
 
 }
