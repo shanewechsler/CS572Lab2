@@ -28,10 +28,17 @@ queue<int> MEMWB;
 queue<int> dests;
 
 unsigned int nextFreeSpace = USER_DATA_BASE; //first address availible in data memory
+unsigned int currentTextAddr = USER_TEXT_BASE; //first availible address in codeMemory
+
+void writeData(char* asciiToWrite, unsigned int startingAddress);
+void readAndPrintData(unsigned int startingAddress);
+void SYSCALL(bool &userMode);
 
 void IF(unsigned int &PC){
-    IFID.push(userText.ReadAddress(PC));
-    PC += 4;
+    if(PC < currentTextAddr){
+        IFID.push(userText.ReadAddress(PC));
+        PC += 4;
+    }
 }
 
 void ID(){
@@ -119,6 +126,7 @@ void EX(unsigned int &PC){
         Rsrc1s.pop();
         Rsrc2s.pop();
         immediates.pop();
+        cout << opcode << endl;
 
         int result = 0;
         switch(opcode){
@@ -129,7 +137,7 @@ void EX(unsigned int &PC){
                 result = A + imm;
                 break;
             case B_SIG:
-                PC += imm;
+                PC += (imm +4);
                 break;
             case BEQZ_SIG:
                 if(A == 0){
@@ -138,12 +146,12 @@ void EX(unsigned int &PC){
                 break;
             case BGE_SIG:
                 if(A >= B){
-                    PC += imm;
+                    PC += imm + 4;
                 }
                 break;
             case BNE_SIG:
                 if(A != B){
-                    PC += imm;
+                    PC += imm + 4;
                 }
                 break;
             case LA_SIG:
@@ -181,7 +189,7 @@ void MEM(){
     }
 }
 
-void WB(){
+void WB(bool &userMode){
     if(!MEMWB.empty()){
         int opcode = MEMWB.front();
         MEMWB.pop();
@@ -193,6 +201,8 @@ void WB(){
 
         if(opcode == ADD_SIG || opcode == ADDI_SIG || opcode == LA_SIG || opcode == LB_SIG || opcode == LI_SIG || opcode == SUBI_SIG){
             GPRs[destination] = result;
+        }else if (opcode == SYSCALL_SIG){
+            SYSCALL(userMode);
         }
     }
 }
@@ -229,6 +239,8 @@ void SYSCALL(bool &userMode){
         userMode = false;
     }
 }
+
+
 
 void ADD(int Rdest, int Rsrc1, int Rsrc2){
     GPRs[Rdest] = GPRs[Rsrc1] + GPRs[Rsrc2];
@@ -278,7 +290,6 @@ void SUBI(int Rdest, int Rsrc1, int imm){
 
 
 int main(int argc, char **argv){
-
     if (argc < 3){
         cout << "Second command line input shpuld be palindrome to test." << endl;
         exit(1);
@@ -292,8 +303,6 @@ int main(int argc, char **argv){
     string instruction;
 
     const char *delimiters = " \t\r\n\v\f ,./$()";
-
-    unsigned int currentTextAddr = USER_TEXT_BASE; //first availible address in codeMemory
 
     while(getline(codeFile, instruction)){
 
@@ -368,11 +377,12 @@ int main(int argc, char **argv){
     unsigned int C = 0;
     bool userMode = true;
     while(userMode){
-        IF(PC);
-        ID();
-        EX(PC);
+        C += 1;
+        WB(userMode);
         MEM();
-        WB();
+        EX(PC);
+        ID();
+        IF(PC);
     }
-
+    cout << C << endl;
 }

@@ -39,6 +39,7 @@ void Assembler::initMap(){
     this->opcodes["li"] = LI_SIG;
     this->opcodes["subi"] = SUBI_SIG;
     this->opcodes["syscall"] =  SYSCALL_SIG;
+    this->opcodes["nop"] = NOP_SIG;
 }
 
 long Assembler::assembleInstr(std::string op, int r1, int r2, int last){
