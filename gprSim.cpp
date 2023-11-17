@@ -15,10 +15,18 @@ char* sysString; //string to test
 
 int GPRs[NUMBER_OF_REGISTERS];
 
+int forwardAControl = 0;
+int forwardBControl = 0;
+
+int forwardEXReg = 0;
+int forwardMEMReg = 0;
+
 using namespace std;
 
 queue<int> Rsrc1s;
 queue<int> Rsrc2s;
+queue<int> RegAs;
+queue<int> RegBs;
 queue<int> immediates;
 
 queue<long> IFID;
@@ -56,14 +64,20 @@ void ID(){
         int imm = 0;
         int dest = 0;
 
+        int reg1 = -1;
+        int reg2 = -1;
+
         switch(opcode){
             case ADD_SIG:
                 A = GPRs[r2];
+                reg1 = r2;
                 B = GPRs[last];
+                reg2 = last;
                 dest = r1;
                 break;
             case ADDI_SIG:
                 A = GPRs[r2];
+                reg1 = r2;
                 imm = last;
                 dest = r1;
                 break;
@@ -72,16 +86,21 @@ void ID(){
                 break;
             case BEQZ_SIG:
                 A = GPRs[r1];
+                reg1 = r1;
                 imm = last;
                 break;
             case BGE_SIG:
                 A = GPRs[r1];
+                reg1 = r1;
                 B = GPRs[r2];
+                reg2 = r2;
                 imm = last;
                 break;
             case BNE_SIG:
                 A = GPRs[r1];
+                reg1 = r1;
                 B = GPRs[r2];
+                reg2 = r2;
                 imm = last;
                 break;
             case LA_SIG:
@@ -90,6 +109,7 @@ void ID(){
                 break;
             case LB_SIG:
                 A = GPRs[r2];
+                reg1 = r2;
                 imm = last;
                 dest = r1;
                 break;
@@ -99,6 +119,7 @@ void ID(){
                 break;
             case SUBI_SIG:
                 A = GPRs[r2];
+                reg1 = r2;
                 imm = last;
                 dest = r1;
                 break;
@@ -106,6 +127,8 @@ void ID(){
 
         Rsrc1s.push(A);
         Rsrc2s.push(B);
+        RegAs.push(reg1);
+        RegBs.push(reg2);
         immediates.push(imm);
         dests.push(dest);
     }
@@ -123,10 +146,33 @@ void EX(unsigned int &PC){
         int B = Rsrc2s.front();
         int imm = immediates.front();
 
+        switch(forwardAControl){
+            case 0:
+                break;
+            case 1:
+                A = forwardEXReg;
+                break;
+            case 2:
+                A = forwardMEMReg;
+                break;
+        }
+
+        switch(forwardBControl){
+            case 0:
+                break;
+            case 1:
+                B = forwardEXReg;
+                break;
+            case 2:
+                B = forwardMEMReg;
+                break;
+        }
+
         Rsrc1s.pop();
         Rsrc2s.pop();
+        RegAs.pop();
+        RegBs.pop();
         immediates.pop();
-        cout << opcode << endl;
 
         int result = 0;
         switch(opcode){
@@ -137,7 +183,7 @@ void EX(unsigned int &PC){
                 result = A + imm;
                 break;
             case B_SIG:
-                PC += (imm +4);
+                PC += imm;
                 break;
             case BEQZ_SIG:
                 if(A == 0){
@@ -146,12 +192,12 @@ void EX(unsigned int &PC){
                 break;
             case BGE_SIG:
                 if(A >= B){
-                    PC += imm + 4;
+                    PC += imm;
                 }
                 break;
             case BNE_SIG:
                 if(A != B){
-                    PC += imm + 4;
+                    PC += imm;
                 }
                 break;
             case LA_SIG:
@@ -180,8 +226,19 @@ void MEM(){
 
         MEMWB.push(opcode);
 
+        forwardEXReg = ALUResult;
+        int forwardPossibility = dests.front();
+
+        if(opcode <= ADDI_SIG || (opcode >= LA_SIG && opcode <= SUBI_SIG)){
+            if (forwardPossibility == RegAs.front()){
+                forwardAControl = 1;
+            }else if(forwardPossibility == RegBs.front()){
+                forwardBControl = 1;
+            }
+        }
+
         int memResult = ALUResult;
-        if(opcode == LA_SIG || opcode == LB_SIG){
+        if(opcode == LB_SIG){
             memResult = userData.ReadAddress(ALUResult);
         }
 
@@ -199,7 +256,15 @@ void WB(bool &userMode){
         int destination = dests.front();
         dests.pop();
 
-        if(opcode == ADD_SIG || opcode == ADDI_SIG || opcode == LA_SIG || opcode == LB_SIG || opcode == LI_SIG || opcode == SUBI_SIG){
+        forwardAControl = 0;
+        forwardBControl = 0;
+        forwardMEMReg = result;
+        if(opcode <= ADDI_SIG || (opcode >= LA_SIG && opcode <= SUBI_SIG)){
+            if(destination == RegAs.front()){
+                forwardAControl = 2;
+            }else if(destination == RegBs.front()){
+                forwardBControl = 2;
+            }
             GPRs[destination] = result;
         }else if (opcode == SYSCALL_SIG){
             SYSCALL(userMode);
