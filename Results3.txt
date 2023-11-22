@@ -1,0 +1,18 @@
+./pipeSim lab3a.s 
+
+Instruction count: 103
+Cycle count: 107
+NOP count: 33
+
+./pipeSim palindrome.s racecar 
+
+The string is a palindrome.
+Instruction count: 106
+Cycle count: 110
+NOP count: 41
+
+./pipeSim lab3c.s 
+
+Instruction count: 58
+Cycle count: 62
+NOP count: 8

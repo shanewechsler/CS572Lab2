@@ -6,13 +6,13 @@ CXX=g++
 # -g3         include information for symbolic debugger e.g. gdb 
 CXXFLAGS=-std=c++11 -Wall -g3 -c
 
-all: gprSim
+all: pipeSim
 
-gprSim : gprSim.o Simulator.o
-	$(CXX) -o gprSim gprSim.o Simulator.o
+pipeSim : pipeSim.o Simulator.o
+	$(CXX) -o pipeSim pipeSim.o Simulator.o
 
 Simulator.o : Simulator.h Simulator.cpp
 	$(CXX) $(CXXFLAGS) Simulator.cpp
 
-gprSim.o : Simulator.h gprSim.cpp
-	$(CXX) $(CXXFLAGS) gprSim.cpp
+pipeSim.o : Simulator.h pipeSim.cpp
+	$(CXX) $(CXXFLAGS) pipeSim.cpp
